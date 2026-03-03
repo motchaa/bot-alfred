@@ -1,0 +1,1 @@
+# O Alfred é o bot temporariamente privado oficial da comunidade Coda.ce. Nesta versão 2.0, o bot foi migrado para uma arquitetura baseada hexagonal, utilizando a Waha API como motor de conexão. 
