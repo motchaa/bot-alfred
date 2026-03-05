@@ -1,4 +1,4 @@
-package com.codace.bot.infrastructure.waha;
+package com.alfred.bot.infrastructure.waha;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

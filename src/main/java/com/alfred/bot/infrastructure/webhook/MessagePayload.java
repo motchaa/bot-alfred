@@ -1,4 +1,4 @@
-package com.codace.bot.infrastructure.webhook;
+package com.alfred.bot.infrastructure.webhook;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

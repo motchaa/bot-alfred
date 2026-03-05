@@ -1,6 +1,6 @@
-package com.codace.bot.infrastructure.webhook;
+package com.alfred.bot.infrastructure.webhook;
 
-import com.codace.bot.infrastructure.waha.WahaClient;
+import com.alfred.bot.infrastructure.waha.WahaClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
