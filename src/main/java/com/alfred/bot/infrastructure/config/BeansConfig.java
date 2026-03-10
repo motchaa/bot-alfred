@@ -1,7 +1,9 @@
 package com.alfred.bot.infrastructure.config;
 
 import com.alfred.bot.application.parser.CommandParser;
+import com.alfred.bot.application.usecase.CheckBalanceService;
 import com.alfred.bot.application.usecase.RegisterExpenseService;
+import com.alfred.bot.domain.port.in.CheckBalanceUseCase;
 import com.alfred.bot.domain.port.in.RegisterExpenseUseCase;
 import com.alfred.bot.domain.port.out.CategoryRepositoryPort;
 import com.alfred.bot.domain.port.out.TransactionRepositoryPort;
@@ -21,5 +23,10 @@ public class BeansConfig {
     @Bean
     public CommandParser commandParser() {
         return new CommandParser();
+    }
+
+    @Bean
+    public CheckBalanceUseCase checkBalanceUseCase(TransactionRepositoryPort transactionRepository) {
+        return new CheckBalanceService(transactionRepository);
     }
 }

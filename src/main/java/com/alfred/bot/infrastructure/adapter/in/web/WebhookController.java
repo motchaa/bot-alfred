@@ -1,84 +1,124 @@
+
 package com.alfred.bot.infrastructure.adapter.in.web;
 
 import com.alfred.bot.application.parser.CommandParser;
+import com.alfred.bot.application.parser.CommandType;
 import com.alfred.bot.domain.model.Transaction;
+import com.alfred.bot.domain.port.in.CheckBalanceUseCase;
 import com.alfred.bot.domain.port.in.RegisterExpenseUseCase;
 import com.alfred.bot.infrastructure.waha.WahaClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
+@Slf4j
 @RestController
-@RequestMapping("/webhook")
+@RequestMapping("/webhook/waha")
+@RequiredArgsConstructor
 public class WebhookController {
-    private static final Logger log = LoggerFactory.getLogger(WebhookController.class);
 
-    private final WahaClient wahaClient;
-    private final RegisterExpenseUseCase registerExpenseUseCase;
     private final CommandParser commandParser;
+    private final RegisterExpenseUseCase registerExpenseUseCase;
+    private final CheckBalanceUseCase checkBalanceUseCase;
+    private final WahaClient wahaClient;
 
-    public WebhookController(WahaClient wahaClient, RegisterExpenseUseCase registerExpenseUseCase, CommandParser commandParser) {
-        this.wahaClient = wahaClient;
-        this.registerExpenseUseCase = registerExpenseUseCase;
-        this.commandParser = commandParser;
-    }
 
-    private String getGreeting() {
-        int hour = LocalTime.now().getHour();
-
-        if (hour >= 6 && hour < 12) {
-            return "Bom dia";
-        } else if (hour >= 12 && hour < 18) {
-            return "Boa tarde";
-        } else {
-            return "Boa noite";
-        }
-    }
-
-    @PostMapping("/waha")
-    public void handle(@RequestBody WahaWebhookEvent event) {
-        // Validação de segurança do evento
-        if (event == null || !"message".equals(event.getEvent()) || event.getPayload() ==
-                null) {
+    @PostMapping
+    public void handleWebhook(@RequestBody WahaWebhookEvent event) {
+        if (event == null || event.getPayload() == null) {
             return;
         }
 
-        String from = event.getPayload().getFrom();
-        String text = event.getPayload().getBody();
+        String chatId = event.getPayload().getFrom(); // No seu código é getFrom()
+        String messageText = event.getPayload().getBody(); // No seu código é getBody()
 
-        log.info("📩 Mensagem de {}: {}", from, text);
+        if (messageText == null || messageText.isBlank()) return;
 
-        if (text == null || text.isBlank()) return;
+        CommandType commandType = commandParser.getCommandType(messageText);
 
-        // O Alfred tenta processar como comando de gasto
+        switch (commandType) {
+            case REGISTER_EXPENSE:
+                handleRegisterExpense(chatId, messageText);
+                break;
+
+            case CHECK_BALANCE:
+                handleCheckBalance(chatId);
+                break;
+
+            default:
+                handleGreeting(chatId);
+                break;
+        }
+    }
+
+    private void handleGreeting(String chatId) {
+        LocalTime now = LocalTime.now();
+        String greeting;
+
+        if (now.getHour() >= 5 && now.getHour() < 12) {
+            greeting = "Bom dia";
+        } else if (now.getHour() >= 12 && now.getHour() < 18) {
+            greeting = "Boa tarde";
+        } else {
+            greeting = "Boa noite";
+        }
+
+        String message = String.format(greeting + " senhor. " + "Alfred seu mordomo digital e guardião dos seus ativos financeiros à sua disposição. \uD83D\uDC54 ☕\uFE0F");
+
+        wahaClient.sendTextMessage(chatId, message);
+    }
+
+    private void handleRegisterExpense(String chatId, String text) {
         commandParser.parse(text).ifPresentOrElse(
-                dto -> {
-                    // SUCESSO: É um gasto!
-                    Transaction transaction = registerExpenseUseCase.execute(dto);
-
-                    String response = String.format(
-                            "Entendido, senhor. Gasto de R$ %.2f em '%s' (%s) devidamente registrado. \uD83D\uDC54 ☕\uFE0F",
-                            transaction.getAmount(),
-                            transaction.getDescription(),
-                            dto.getCategoryName()
+                request -> {
+                    registerExpenseUseCase.execute(request);
+                    String successMsg = String.format(
+                            "✅ *Gasto registrado, senhor.*\n\n" +
+                                    "📝 *Descrição:* %s\n" +
+                                    "💰 *Valor:* R$ %.2f\n" +
+                                    "🏷️ *Categoria:* %s",
+                            request.getDescription(), request.getAmount(),
+                            request.getCategoryName()
                     );
-
-                    wahaClient.sendTextMessage(from, response);
-                    log.info("✅ Gasto registrado: {}", response);
+                    wahaClient.sendTextMessage(chatId, successMsg);
                 },
-                () -> {
-                    // FALHA: Apenas papo furado.
-                    String greeting = getGreeting();
-                    String response = greeting + " senhor. " +
-                            "Alfred seu mordomo digital e guardião dos seus ativos financeiros à sua disposição. \uD83D\uDC54 ☕\uFE0F";
-
-                    wahaClient.sendTextMessage(from, response);
-                    log.info("👋 Saudação padrão enviada.");
-                }
+                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse:` /gasto descrição categoria`")
         );
     }
+
+    private void handleCheckBalance(String chatId) {
+        try {
+            List<Transaction> transactions =
+                    checkBalanceUseCase.getTransactionsForCurrentMonth();
+            BigDecimal total = checkBalanceUseCase.getTotalBalanceForCurrentMonth();
+
+            if (transactions.isEmpty()) {
+                wahaClient.sendTextMessage(chatId, "📭 *Nenhum gasto registrado este mês, chefe ! * ");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder("📋 *EXTRATO MENSAL DETALHADO* \n\n");
+
+            for (Transaction t : transactions) {
+                String date = t.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM"));
+                sb.append(String.format("• [%s] *R$ %.2f* - %s\n",
+                        date, t.getAmount(), t.getDescription()));
+            }
+
+            sb.append(String.format("\n💰 *TOTAL DO MÊS: R$ %.2f*", total));
+
+            wahaClient.sendTextMessage(chatId, sb.toString());
+        } catch (Exception e) {
+            log.error("Erro ao gerar extrato: ", e);
+            wahaClient.sendTextMessage(chatId, "❌ *Erro ao gerar extrato.*");
+        }
+    }
 }
-
-

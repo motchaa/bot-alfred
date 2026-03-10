@@ -6,47 +6,32 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 public class CommandParser {
+    public CommandType getCommandType(String text) {
+        return CommandType.fromText(text);
+    }
+
     public Optional<TransactionRequestDTO> parse(String text) {
-        if(text == null || text.isBlank()) {
-            return Optional.empty();
-        }
-
         String[] parts = text.trim().split("\\s+");
-
-        if(parts.length < 3) {
-            return Optional.empty();
-        }
-
-        String command = parts[0].toLowerCase();
-        if(!"/gasto".equals(command)) {
-            return Optional.empty();
-        }
+        if (parts.length < 3) return Optional.empty();
 
         try {
-            String amountStr = parts[1].replace(",",".");
-            BigDecimal amount = new BigDecimal(amountStr);
+            BigDecimal amount = new BigDecimal(parts[1].replace(",", "."));
+            String categoryName = parts.length == 3 ? "General" : parts[parts.length - 1];
 
-            String description;
-            String categoryName;
-
-            if (parts.length == 3) {
-                description = parts[2];
-                categoryName = "Geral";
-            } else {
-                categoryName = parts[parts.length - 1];
-
-                StringBuilder sb = new StringBuilder();
-
-                for(int i = 2; i < parts.length - 1; i++) {
-                    sb.append(parts[i]).append(" ");
-                }
-
-                description = sb.toString().trim();
-            }
+            String description = extractDescription(parts);
 
             return Optional.of(new TransactionRequestDTO(amount, description, categoryName));
-        } catch (NumberFormatException e) {
+        } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    private String extractDescription(String[] parts) {
+        if (parts.length == 3) return parts[2];
+        StringBuilder sb = new StringBuilder();
+        for(int i = 2; i < parts.length - 1; i++) {
+          sb.append(parts[i]).append(" ");
+        }
+        return sb.toString().trim();
     }
 }
