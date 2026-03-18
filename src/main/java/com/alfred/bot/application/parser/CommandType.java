@@ -3,7 +3,8 @@ package com.alfred.bot.application.parser;
 import java.util.Arrays;
 
 public enum CommandType {
-    REGISTER_EXPENSE("/gasto"),
+    REGISTER_INCOME("/entrada"),
+    REGISTER_EXPENSE("/saida"),
     CHECK_BALANCE("/extrato"),
     UNKNOWN("");
 

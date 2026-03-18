@@ -1,6 +1,7 @@
 package com.alfred.bot.application.usecase;
 
 import com.alfred.bot.domain.model.Transaction;
+import com.alfred.bot.domain.model.TransactionType;
 import com.alfred.bot.domain.port.in.CheckBalanceUseCase;
 import com.alfred.bot.domain.port.out.TransactionRepositoryPort;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +17,7 @@ public class CheckBalanceService implements CheckBalanceUseCase {
 
     @Override
     public BigDecimal getTotalBalanceForCurrentMonth() {
-        LocalDate now = LocalDate.now();
-        BigDecimal balance = transactionRepository.sumAmountByMonthAndYear(now.getMonthValue(), now.getYear());
-        return balance != null ? balance : BigDecimal.ZERO;
+        return getBalanceSummaryForCurrentMonth().currentBalance();
     }
 
     @Override
@@ -31,5 +30,18 @@ public class CheckBalanceService implements CheckBalanceUseCase {
     public List<Transaction> getTransactionsForCurrentMonth() {
         LocalDate now = LocalDate.now();
         return transactionRepository.findByMonthAndYear(now.getMonthValue(), now.getYear());
+    }
+
+    @Override
+    public BalanceSummary getBalanceSummaryForCurrentMonth() {
+        LocalDate now = LocalDate.now();
+        int month = now.getMonthValue();
+        int year = now.getYear();
+
+        BigDecimal incomes = transactionRepository.sumAmountByTypeAndMonthAndYear(TransactionType.INCOME, month, year);
+        BigDecimal expenses = transactionRepository.sumAmountByTypeAndMonthAndYear(TransactionType.EXPENSE, month, year);
+
+        return new BalanceSummary(incomes != null ? incomes : BigDecimal.ZERO, expenses != null ? expenses : BigDecimal.ZERO, (incomes != null ? incomes : BigDecimal.ZERO).subtract(expenses != null ? expenses
+                : BigDecimal.ZERO));
     }
 }

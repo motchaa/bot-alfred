@@ -16,7 +16,7 @@ public class CommandParser {
 
         try {
             BigDecimal amount = new BigDecimal(parts[1].replace(",", "."));
-            String categoryName = parts.length == 3 ? "General" : parts[parts.length - 1];
+            String categoryName = parts.length == 3 ? "Geral" : parts[parts.length - 1];
 
             String description = extractDescription(parts);
 

@@ -8,6 +8,17 @@ import java.util.Map;
 
 public interface CheckBalanceUseCase {
     BigDecimal getTotalBalanceForCurrentMonth();
+
     Map<String, BigDecimal> getExpensesByCategoryForCurrentMonth();
+
     List<Transaction> getTransactionsForCurrentMonth();
+
+    public record BalanceSummary(
+            BigDecimal totalIncomes,
+            BigDecimal totalExpenses,
+            BigDecimal currentBalance
+    ) {
+    }
+
+    BalanceSummary getBalanceSummaryForCurrentMonth();
 }

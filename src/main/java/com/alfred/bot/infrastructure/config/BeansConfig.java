@@ -3,8 +3,10 @@ package com.alfred.bot.infrastructure.config;
 import com.alfred.bot.application.parser.CommandParser;
 import com.alfred.bot.application.usecase.CheckBalanceService;
 import com.alfred.bot.application.usecase.RegisterExpenseService;
+import com.alfred.bot.application.usecase.RegisterIncomeService;
 import com.alfred.bot.domain.port.in.CheckBalanceUseCase;
 import com.alfred.bot.domain.port.in.RegisterExpenseUseCase;
+import com.alfred.bot.domain.port.in.RegisterIncomeUseCase;
 import com.alfred.bot.domain.port.out.CategoryRepositoryPort;
 import com.alfred.bot.domain.port.out.TransactionRepositoryPort;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,13 @@ public class BeansConfig {
             TransactionRepositoryPort transactionRepository,
             CategoryRepositoryPort categoryRepository) {
         return new RegisterExpenseService(transactionRepository, categoryRepository);
+    }
+
+    @Bean
+    public RegisterIncomeUseCase registerIncomeUseCase(
+            TransactionRepositoryPort transactionRepository,
+            CategoryRepositoryPort categoryRepository) {
+        return new RegisterIncomeService(transactionRepository, categoryRepository) {};
     }
 
     @Bean

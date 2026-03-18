@@ -6,6 +6,7 @@ import com.alfred.bot.application.parser.CommandType;
 import com.alfred.bot.domain.model.Transaction;
 import com.alfred.bot.domain.port.in.CheckBalanceUseCase;
 import com.alfred.bot.domain.port.in.RegisterExpenseUseCase;
+import com.alfred.bot.domain.port.in.RegisterIncomeUseCase;
 import com.alfred.bot.infrastructure.waha.WahaClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class WebhookController {
     private final RegisterExpenseUseCase registerExpenseUseCase;
     private final CheckBalanceUseCase checkBalanceUseCase;
     private final WahaClient wahaClient;
+    private final RegisterIncomeUseCase registerIncomeUseCase;
 
 
     @PostMapping
@@ -37,8 +39,8 @@ public class WebhookController {
             return;
         }
 
-        String chatId = event.getPayload().getFrom(); // No seu código é getFrom()
-        String messageText = event.getPayload().getBody(); // No seu código é getBody()
+        String chatId = event.getPayload().getFrom();
+        String messageText = event.getPayload().getBody();
 
         if (messageText == null || messageText.isBlank()) return;
 
@@ -51,6 +53,10 @@ public class WebhookController {
 
             case CHECK_BALANCE:
                 handleCheckBalance(chatId);
+                break;
+
+            case REGISTER_INCOME:
+                handleRegisterIncome(chatId, messageText);
                 break;
 
             default:
@@ -81,7 +87,7 @@ public class WebhookController {
                 request -> {
                     registerExpenseUseCase.execute(request);
                     String successMsg = String.format(
-                            "✅ *Gasto registrado, senhor.*\n\n" +
+                            "✅ *Saída registrada, senhor.*\n\n" +
                                     "📝 *Descrição:* %s\n" +
                                     "💰 *Valor:* R$ %.2f\n" +
                                     "🏷️ *Categoria:* %s",
@@ -90,18 +96,36 @@ public class WebhookController {
                     );
                     wahaClient.sendTextMessage(chatId, successMsg);
                 },
-                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse:` /gasto descrição categoria`")
+                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse:` /saida descrição categoria`")
+        );
+    }
+
+    private void handleRegisterIncome(String chatId, String text) {
+        commandParser.parse(text).ifPresentOrElse(
+                request -> {
+                    registerIncomeUseCase.execute(request);
+                    String successMsg = String.format(
+                            "✅ *Entrada registrada, senhor.*\n\n" +
+                                    "📝 *Descrição:* %s\n" +
+                                    "💰 *Valor:* R$ %.2f\n" +
+                                    "🏷️ *Categoria:* %s",
+                            request.getDescription(), request.getAmount(),
+                            request.getCategoryName()
+                    );
+                    wahaClient.sendTextMessage(chatId, successMsg);
+                },
+                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse:` /entrada descrição categoria`")
         );
     }
 
     private void handleCheckBalance(String chatId) {
         try {
+            CheckBalanceUseCase.BalanceSummary summary = checkBalanceUseCase.getBalanceSummaryForCurrentMonth();
             List<Transaction> transactions =
                     checkBalanceUseCase.getTransactionsForCurrentMonth();
-            BigDecimal total = checkBalanceUseCase.getTotalBalanceForCurrentMonth();
 
             if (transactions.isEmpty()) {
-                wahaClient.sendTextMessage(chatId, "📭 *Nenhum gasto registrado este mês, chefe ! * ");
+                wahaClient.sendTextMessage(chatId, "📭 *Nenhuma movimentação registrada este mês, chefe ! * ");
                 return;
             }
 
@@ -109,13 +133,23 @@ public class WebhookController {
 
             for (Transaction t : transactions) {
                 String date = t.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM"));
-                sb.append(String.format("• [%s] *R$ %.2f* - %s\n",
-                        date, t.getAmount(), t.getDescription()));
+                String icon = (t.getType() ==
+                        com.alfred.bot.domain.model.TransactionType.INCOME) ? "📈" : "📉";
+
+                boolean isIncome = t.getType() == com.alfred.bot.domain.model.TransactionType.INCOME;
+                String prefix = isIncome ? "[+]" : "[-]";
+
+                sb.append(String.format("%s %s [%s] *R$ %.2f* - %s\n",
+                        icon,prefix, date, t.getAmount(), t.getDescription()));
             }
 
-            sb.append(String.format("\n💰 *TOTAL DO MÊS: R$ %.2f*", total));
+            sb.append("\n─────────────────\n");
+            sb.append(String.format("📈 *Total de Entradas:* R$ %.2f\n", summary.totalIncomes()));
+            sb.append(String.format("📉 *Total de Saídas:* R$ %.2f\n", summary.totalExpenses()));
+            sb.append(String.format("\n💰 *SALDO GERAL: R$ %.2f*", summary.currentBalance()));
 
             wahaClient.sendTextMessage(chatId, sb.toString());
+
         } catch (Exception e) {
             log.error("Erro ao gerar extrato: ", e);
             wahaClient.sendTextMessage(chatId, "❌ *Erro ao gerar extrato.*");

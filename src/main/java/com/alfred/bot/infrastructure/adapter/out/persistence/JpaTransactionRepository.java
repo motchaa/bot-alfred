@@ -1,6 +1,7 @@
 package com.alfred.bot.infrastructure.adapter.out.persistence;
 
 import com.alfred.bot.domain.model.Transaction;
+import com.alfred.bot.domain.model.TransactionType;
 import com.alfred.bot.domain.port.out.TransactionRepositoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -44,8 +45,8 @@ public class JpaTransactionRepository implements TransactionRepositoryPort {
     }
 
     @Override
-    public BigDecimal sumAmountByMonthAndYear(int month, int year) {
-        BigDecimal total = repository.sumAmountByMonthAndYear(month, year);
+    public BigDecimal sumAmountByTypeAndMonthAndYear(TransactionType type, int month, int year) {
+        BigDecimal total = repository.sumAmountByTypeAndMonthAndYear(type ,month, year);
         return total != null ? total : BigDecimal.ZERO;
     }
 
