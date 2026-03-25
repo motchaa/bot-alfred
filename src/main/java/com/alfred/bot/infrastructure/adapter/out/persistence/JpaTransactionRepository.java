@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -14,7 +15,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class JpaTransactionRepository implements TransactionRepositoryPort {
-    
+
     private final SpringDataTransactionRepository repository;
 
     @Override
@@ -38,21 +39,21 @@ public class JpaTransactionRepository implements TransactionRepositoryPort {
     }
 
     @Override
-    public List<Transaction> findByMonthAndYear(int month, int year) {
-        return repository.findByMonthAndYear(month, year).stream()
+    public List<Transaction> findByRange(LocalDateTime start, LocalDateTime end) {
+        return repository.findByRange(start, end).stream()
                 .map(this::mapToDomain)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public BigDecimal sumAmountByTypeAndMonthAndYear(TransactionType type, int month, int year) {
-        BigDecimal total = repository.sumAmountByTypeAndMonthAndYear(type ,month, year);
+    public BigDecimal sumAmountByTypeInRange(TransactionType type, LocalDateTime start, LocalDateTime end) {
+        BigDecimal total = repository.sumAmountByTypeInRange(type, start, end);
         return total != null ? total : BigDecimal.ZERO;
     }
 
     @Override
-    public Map<String, BigDecimal> sumAmountByCategoryInMonthAndYear(int month, int year) {
-        List<Object[]> results = repository.sumAmountByCategoryGrouped(month, year);
+    public Map<String, BigDecimal> sumAmountByCategoryInRange(LocalDateTime start, LocalDateTime end) {
+        List<Object[]> results = repository.sumAmountByCategoryGrouped(start, end);
         return results.stream().collect(Collectors.toMap(
                 row -> (String) row[0],
                 row -> (BigDecimal) row[1]
@@ -66,6 +67,7 @@ public class JpaTransactionRepository implements TransactionRepositoryPort {
                 .description(entity.getDescription())
                 .type(entity.getType())
                 .categoryId(entity.getCategoryId())
+                .categoryName(entity.getCategory() != null ? entity.getCategory().getName() : "Geral")
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

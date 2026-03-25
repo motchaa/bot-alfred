@@ -19,5 +19,5 @@ public class Transaction {
     private LocalDateTime createdAt;
     private TransactionType type;
     private Long categoryId;
-
+    private String categoryName;
 }

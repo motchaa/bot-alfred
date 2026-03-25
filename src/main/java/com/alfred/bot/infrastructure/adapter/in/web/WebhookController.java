@@ -19,6 +19,8 @@ import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -120,28 +122,34 @@ public class WebhookController {
 
     private void handleCheckBalance(String chatId) {
         try {
+            List<Transaction> transactions = checkBalanceUseCase.getTransactionsForCurrentMonth();
             CheckBalanceUseCase.BalanceSummary summary = checkBalanceUseCase.getBalanceSummaryForCurrentMonth();
-            List<Transaction> transactions =
-                    checkBalanceUseCase.getTransactionsForCurrentMonth();
 
             if (transactions.isEmpty()) {
-                wahaClient.sendTextMessage(chatId, "📭 *Nenhuma movimentação registrada este mês, chefe ! * ");
+                wahaClient.sendTextMessage(chatId, "📭 *Nenhuma movimentação registrada este mês, senhor ! * ");
                 return;
             }
 
+            Map<String, List<Transaction>> grouped = transactions.stream().collect(Collectors.groupingBy(t -> t.getCategoryName() != null ? t.getCategoryName() : "Geral"));
+
             StringBuilder sb = new StringBuilder("📋 *EXTRATO MENSAL DETALHADO* \n\n");
 
-            for (Transaction t : transactions) {
-                String date = t.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM"));
-                String icon = (t.getType() ==
-                        com.alfred.bot.domain.model.TransactionType.INCOME) ? "📈" : "📉";
+            grouped.forEach((categoryName, list) -> {
+                sb.append(String.format("*%s:*\n", categoryName.toUpperCase()));
 
-                boolean isIncome = t.getType() == com.alfred.bot.domain.model.TransactionType.INCOME;
-                String prefix = isIncome ? "[+]" : "[-]";
+                for (Transaction t : list) {
+                    String date = t.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM"));
+                    String icon = (t.getType() ==
+                            com.alfred.bot.domain.model.TransactionType.INCOME) ? "📈" : "📉";
 
-                sb.append(String.format("%s %s [%s] *R$ %.2f* - %s\n",
-                        icon,prefix, date, t.getAmount(), t.getDescription()));
-            }
+                    boolean isIncome = t.getType() == com.alfred.bot.domain.model.TransactionType.INCOME;
+                    String prefix = isIncome ? "[+]" : "[-]";
+
+                    sb.append(String.format("%s %s [%s] *R$ %.2f* - %s\n",
+                            icon, prefix, date, t.getAmount(), t.getDescription()));
+                }
+                sb.append("\n");
+            });
 
             sb.append("\n─────────────────\n");
             sb.append(String.format("📈 *Total de Entradas:* R$ %.2f\n", summary.totalIncomes()));
