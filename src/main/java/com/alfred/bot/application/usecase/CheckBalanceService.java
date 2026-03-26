@@ -44,15 +44,28 @@ public class CheckBalanceService implements CheckBalanceUseCase {
     }
 
     @Override
+    public List<Transaction> getTransactionsByRange(LocalDateTime start, LocalDateTime end) {
+        return transactionRepository.findByRange(start,end);
+    }
+
+    @Override
     public BalanceSummary getBalanceSummaryForCurrentMonth() {
         LocalDate now = LocalDate.now();
         LocalDateTime start = now.withDayOfMonth(1).atStartOfDay();
         LocalDateTime end = now.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59, 59);
 
+        return getBalanceSummaryByRange(start, end);
+    }
+
+    @Override
+    public BalanceSummary getBalanceSummaryByRange(LocalDateTime start, LocalDateTime end) {
         BigDecimal incomes = transactionRepository.sumAmountByTypeInRange(TransactionType.INCOME, start, end);
         BigDecimal expenses = transactionRepository.sumAmountByTypeInRange(TransactionType.EXPENSE, start, end);
 
-        return new BalanceSummary(incomes != null ? incomes : BigDecimal.ZERO, expenses != null ? expenses : BigDecimal.ZERO, (incomes != null ? incomes : BigDecimal.ZERO).subtract(expenses != null ? expenses
-                : BigDecimal.ZERO));
+        BigDecimal incomesSafe = incomes != null ? incomes : BigDecimal.ZERO;
+        BigDecimal expensesSafe = expenses != null ? expenses : BigDecimal.ZERO;
+
+        return new BalanceSummary(incomesSafe, expensesSafe, incomesSafe.subtract(expensesSafe));
+
     }
 }

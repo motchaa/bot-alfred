@@ -26,6 +26,18 @@ public class CommandParser {
         }
     }
 
+    public Optional<Integer> parseMonth(String text) {
+        String[] parts = text.trim().split("\\s+");
+        if (parts.length < 2) return Optional.empty();
+
+        try {
+            int month = Integer.parseInt(parts[1]);
+            return (month >= 1 && month <= 12) ? Optional.of(month) : Optional.empty();
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
     private String extractDescription(String[] parts) {
         if (parts.length == 3) return parts[2];
         StringBuilder sb = new StringBuilder();
