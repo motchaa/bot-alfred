@@ -6,6 +6,9 @@ public enum CommandType {
     REGISTER_INCOME("/entrada"),
     REGISTER_EXPENSE("/saida"),
     CHECK_BALANCE("/extrato"),
+    SET_LIMIT("/limite"),
+    CONFIRM_YES("sim"),
+    CONFIRM_NO("não"),
     UNKNOWN("");
 
     private final String prefix;

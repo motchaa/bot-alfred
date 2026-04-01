@@ -7,7 +7,10 @@ import java.util.Optional;
 
 public class CommandParser {
     public CommandType getCommandType(String text) {
-        return CommandType.fromText(text);
+        if (text == null || text.isBlank()) return CommandType.UNKNOWN;
+        String firstWord = text.trim().split("\\s+")[0].toLowerCase();
+
+        return CommandType.fromText(firstWord);
     }
 
     public Optional<TransactionRequestDTO> parse(String text) {
@@ -45,5 +48,15 @@ public class CommandParser {
           sb.append(parts[i]).append(" ");
         }
         return sb.toString().trim();
+    }
+
+    public Optional<BigDecimal> parseLimit(String text) {
+        String[] parts = text.trim().split("\\s+");
+        if (parts.length < 2) return Optional.empty();
+        try {
+            return Optional.of(new BigDecimal(parts[1].replace(",", ".")));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 }

@@ -1,11 +1,13 @@
-
 package com.alfred.bot.infrastructure.adapter.in.web;
 
+import com.alfred.bot.application.dto.TransactionRequestDTO;
 import com.alfred.bot.application.parser.CommandParser;
 import com.alfred.bot.application.parser.CommandType;
+import com.alfred.bot.application.usecase.PendingTransactionService;
 import com.alfred.bot.domain.model.Transaction;
 import com.alfred.bot.domain.model.TransactionType;
 import com.alfred.bot.domain.port.in.CheckBalanceUseCase;
+import com.alfred.bot.domain.port.in.ManageMonthlyLimitUseCase;
 import com.alfred.bot.domain.port.in.RegisterExpenseUseCase;
 import com.alfred.bot.domain.port.in.RegisterIncomeUseCase;
 import com.alfred.bot.infrastructure.waha.WahaClient;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -24,7 +27,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -39,6 +41,8 @@ public class WebhookController {
     private final CheckBalanceUseCase checkBalanceUseCase;
     private final WahaClient wahaClient;
     private final RegisterIncomeUseCase registerIncomeUseCase;
+    private final ManageMonthlyLimitUseCase manageMonthlyLimitUseCase;
+    private final PendingTransactionService pendingTransactionService;
 
 
     @PostMapping
@@ -67,6 +71,18 @@ public class WebhookController {
                 handleRegisterIncome(chatId, messageText);
                 break;
 
+            case SET_LIMIT:
+                handleSetLimit(chatId, messageText);
+                break;
+
+            case CONFIRM_YES:
+                handleConfirmationYes(chatId);
+                break;
+
+            case CONFIRM_NO:
+                handleConfirmationNo(chatId);
+                break;
+
             default:
                 handleGreeting(chatId);
                 break;
@@ -85,26 +101,41 @@ public class WebhookController {
             greeting = "Boa noite";
         }
 
-        String message = String.format(greeting + " senhor. " + "Alfred seu mordomo digital e guardião dos seus ativos financeiros à sua disposição. \uD83D\uDC54 ☕\uFE0F");
+        String message = String.format(greeting + " senhor. Alfred seu mordomo digital e guardião dos seus ativos financeiros à sua disposição. \uD83D\uDC54 ☕\uFE0F");
 
         wahaClient.sendTextMessage(chatId, message);
+    }
+
+    private void handleSetLimit(String chatId, String text) {
+        commandParser.parseLimit(text).ifPresentOrElse(
+                amount -> {
+                    LocalDate now = LocalDate.now();
+                    manageMonthlyLimitUseCase.setLimit(now.getMonthValue(), now.getYear(), amount);
+                    String msg = String.format("✅ *Limite definido, senhor.*\n\n💰 *Valor:* R$ %.2f\n📅 *Período:* %d/%d",
+                            amount, now.getMonthValue(), now.getYear());
+                    wahaClient.sendTextMessage(chatId, msg);
+                },
+                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse: `/limite 1000.00`")
+        );
     }
 
     private void handleRegisterExpense(String chatId, String text) {
         commandParser.parse(text).ifPresentOrElse(
                 request -> {
-                    registerExpenseUseCase.execute(request);
-                    String successMsg = String.format(
-                            "✅ *Saída registrada, senhor.*\n\n" +
-                                    "📝 *Descrição:* %s\n" +
-                                    "💰 *Valor:* R$ %.2f\n" +
-                                    "🏷️ *Categoria:* %s",
-                            request.getDescription(), request.getAmount(),
-                            request.getCategoryName()
-                    );
-                    wahaClient.sendTextMessage(chatId, successMsg);
+                    if (willExceedLimit(request.getAmount())) {
+                        pendingTransactionService.addPending(chatId, request);
+                        String alertMsg = String.format(
+                                "🚨 *LIMITE EM RISCO, SENHOR!*\n\n" +
+                                "⚠️ Esta saída de *R$ %.2f* ultrapassará seu limite mensal.\n\n" +
+                                "*O senhor realmente deseja ultrapassar seu limite?* (Responda com *Sim* ou *Não*)",
+                                request.getAmount()
+                        );
+                        wahaClient.sendTextMessage(chatId, alertMsg);
+                    } else {
+                        executeExpenseRegistration(chatId, request);
+                    }
                 },
-                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse:` /saida descrição categoria`")
+                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse: `/saida descrição categoria`")
         );
     }
 
@@ -122,7 +153,7 @@ public class WebhookController {
                     );
                     wahaClient.sendTextMessage(chatId, successMsg);
                 },
-                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse:` /entrada descrição categoria`")
+                () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse: `/entrada descrição categoria`")
         );
     }
 
@@ -135,25 +166,25 @@ public class WebhookController {
 
                     String monthName = targetDate.getMonth().getDisplayName(TextStyle.FULL, new java.util.Locale("pt", "BR"));
 
-                    generateAndSendReport(chatId, start, end, "EXTRATO DE " + monthName.toUpperCase());
+                    generateAndSendReport(chatId, start, end, "EXTRATO DE " + monthName.toUpperCase(), month, targetDate.getYear());
                 },
                 () -> {
                     LocalDate now = LocalDate.now();
                     LocalDateTime start = now.withDayOfMonth(1).atStartOfDay();
                     LocalDateTime end = now.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59, 59);
 
-                    generateAndSendReport(chatId, start, end, "EXTRATO MENSAL DETALHADO");
+                    generateAndSendReport(chatId, start, end, "EXTRATO MENSAL DETALHADO", now.getMonthValue(), now.getYear());
                 }
         );
     }
 
-    private void generateAndSendReport(String chatId, LocalDateTime start, LocalDateTime end, String title) {
+    private void generateAndSendReport(String chatId, LocalDateTime start, LocalDateTime end, String title, int month, int year) {
         try {
             List<Transaction> transactions = checkBalanceUseCase.getTransactionsByRange(start, end);
             CheckBalanceUseCase.BalanceSummary summary = checkBalanceUseCase.getBalanceSummaryByRange(start, end);
 
             if (transactions.isEmpty()) {
-                wahaClient.sendTextMessage(chatId, "📭 *Nenhuma movimentação registrada no período solicitado, senhor ! * ");
+                wahaClient.sendTextMessage(chatId, "📭 *Nenhuma movimentação registrada no período solicitado, senhor!*");
                 return;
             }
 
@@ -180,6 +211,14 @@ public class WebhookController {
             sb.append("\n─────────────────\n");
             sb.append(String.format("📈 *Total de Entradas:* R$ %.2f\n", summary.totalIncomes()));
             sb.append(String.format("📉 *Total de Saídas:* R$ %.2f\n", summary.totalExpenses()));
+
+            BigDecimal limit = manageMonthlyLimitUseCase.getLimitForMonth(month, year);
+            if (limit.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append(String.format("🎯 *Limite Mensal:* R$ %.2f\n", limit));
+                BigDecimal usagePercent = summary.totalExpenses().multiply(new BigDecimal(100)).divide(limit, 1, RoundingMode.HALF_UP);
+                sb.append(String.format("📊 *Uso do Limite:* %s%%\n", usagePercent));
+            }
+
             sb.append(String.format("\n💰 *SALDO GERAL: R$ %.2f*", summary.currentBalance()));
 
             wahaClient.sendTextMessage(chatId, sb.toString());
@@ -190,5 +229,71 @@ public class WebhookController {
         }
     }
 
+    private boolean willExceedLimit(BigDecimal newAmount) {
+        LocalDate now = LocalDate.now();
+        BigDecimal limit = manageMonthlyLimitUseCase.getLimitForMonth(now.getMonthValue(), now.getYear());
 
+        if (limit.compareTo(BigDecimal.ZERO) <= 0) return false;
+
+        CheckBalanceUseCase.BalanceSummary summary = checkBalanceUseCase.getBalanceSummaryByRange(
+                now.withDayOfMonth(1).atStartOfDay(),
+                now.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59, 59)
+        );
+        return summary.totalExpenses().add(newAmount).compareTo(limit) > 0;
+    }
+
+    private void handleConfirmationYes(String chatId) {
+        pendingTransactionService.getAndRemovePending(chatId).ifPresentOrElse(
+                request -> {
+                    wahaClient.sendTextMessage(chatId, "🫡 *Entendido, senhor. Limite ignorado desta vez.*");
+                    executeExpenseRegistration(chatId, request);
+                },
+                () -> wahaClient.sendTextMessage(chatId, "❓ *Não encontrei nenhuma transação pendente, senhor.*")
+        );
+    }
+
+    private void handleConfirmationNo(String chatId) {
+        pendingTransactionService.clearPending(chatId);
+        wahaClient.sendTextMessage(chatId, "✅ *Operação cancelada. Seus ativos permanecem protegidos, senhor.*");
+    }
+
+    private void executeExpenseRegistration(String chatId, TransactionRequestDTO request) {
+        registerExpenseUseCase.execute(request);
+        String successMsg = String.format(
+                "✅ *Saída registrada, senhor.*\n\n" +
+                        "📝 *Descrição:* %s\n" +
+                        "💰 *Valor:* R$ %.2f\n" +
+                        "🏷️ *Categoria:* %s",
+                request.getDescription(), request.getAmount(),
+                request.getCategoryName()
+        );
+        wahaClient.sendTextMessage(chatId, successMsg);
+
+        checkLimitAlert(chatId);
+    }
+
+    private void checkLimitAlert(String chatId) {
+        LocalDate now = LocalDate.now();
+        BigDecimal limit = manageMonthlyLimitUseCase.getLimitForMonth(now.getMonthValue(), now.getYear());
+
+        if (limit.compareTo(BigDecimal.ZERO) > 0) {
+            LocalDateTime start = now.withDayOfMonth(1).atStartOfDay();
+            LocalDateTime end = now.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59, 59);
+            CheckBalanceUseCase.BalanceSummary summary = checkBalanceUseCase.getBalanceSummaryByRange(start, end);
+
+            BigDecimal totalSpent = summary.totalExpenses();
+
+            if (totalSpent.compareTo(limit) > 0) {
+                String alertMsg = String.format(
+                        "🚨 *ALERTA DE GASTOS, SENHOR!*\n\n" +
+                        "⚠️ O senhor ultrapassou o limite definido para este mês.\n\n" +
+                        "🎯 *Limite:* R$ %.2f\n" +
+                        "📉 *Gasto Atual:* R$ %.2f\n" +
+                        "🚩 *Excesso:* R$ %.2f",
+                        limit, totalSpent, totalSpent.subtract(limit)
+                );
+                wahaClient.sendTextMessage(chatId, alertMsg);
+            }
+        }
+    }
 }
