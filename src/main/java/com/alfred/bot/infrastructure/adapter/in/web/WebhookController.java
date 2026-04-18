@@ -67,6 +67,10 @@ public class WebhookController {
                 handleCheckBalance(chatId, messageText);
                 break;
 
+            case HELP:
+                handleHelp(chatId);
+                break;
+
             case REGISTER_INCOME:
                 handleRegisterIncome(chatId, messageText);
                 break;
@@ -106,6 +110,25 @@ public class WebhookController {
         wahaClient.sendTextMessage(chatId, message);
     }
 
+    public void handleHelp(String chatId) {
+        String helpMessage = """
+                *COMANDOS DO ALFRED* \uD83D\uDC54 
+                
+                    Como seu mordomo digital, aqui estão as tarefas que posso realizar para o senhor:
+                
+                    💰 */entrada [valor] [descrição]* - Registra um novo aporte.
+                    📉 */saida [valor] [descrição] [categoria]* - Registra uma despesa.
+                    📊 */extrato* - Exibe o resumo do mês atual.
+                    📅 */extrato [mês]* - Exibe o resumo de um mês específico (ex: /extrato 05).
+                    🎯 */limite [valor]* - Define seu teto de gastos mensal.
+                    ❓ */help* - Exibe esta lista de comandos.
+                
+                    *Dica:* Ao registrar uma saída, se não informar a categoria, eu utilizarei 'Geral'.
+                """;
+
+        wahaClient.sendTextMessage(chatId, helpMessage);
+    }
+
     private void handleSetLimit(String chatId, String text) {
         commandParser.parseLimit(text).ifPresentOrElse(
                 amount -> {
@@ -126,8 +149,8 @@ public class WebhookController {
                         pendingTransactionService.addPending(chatId, request);
                         String alertMsg = String.format(
                                 "🚨 *LIMITE EM RISCO, SENHOR!*\n\n" +
-                                "⚠️ Esta saída de *R$ %.2f* ultrapassará seu limite mensal.\n\n" +
-                                "*O senhor realmente deseja ultrapassar seu limite?* (Responda com *Sim* ou *Não*)",
+                                        "⚠️ Esta saída de *R$ %.2f* ultrapassará seu limite mensal.\n\n" +
+                                        "*O senhor realmente deseja ultrapassar seu limite?* (Responda com *Sim* ou *Não*)",
                                 request.getAmount()
                         );
                         wahaClient.sendTextMessage(chatId, alertMsg);
@@ -286,10 +309,10 @@ public class WebhookController {
             if (totalSpent.compareTo(limit) > 0) {
                 String alertMsg = String.format(
                         "🚨 *ALERTA DE GASTOS, SENHOR!*\n\n" +
-                        "⚠️ O senhor ultrapassou o limite definido para este mês.\n\n" +
-                        "🎯 *Limite:* R$ %.2f\n" +
-                        "📉 *Gasto Atual:* R$ %.2f\n" +
-                        "🚩 *Excesso:* R$ %.2f",
+                                "⚠️ O senhor ultrapassou o limite definido para este mês.\n\n" +
+                                "🎯 *Limite:* R$ %.2f\n" +
+                                "📉 *Gasto Atual:* R$ %.2f\n" +
+                                "🚩 *Excesso:* R$ %.2f",
                         limit, totalSpent, totalSpent.subtract(limit)
                 );
                 wahaClient.sendTextMessage(chatId, alertMsg);

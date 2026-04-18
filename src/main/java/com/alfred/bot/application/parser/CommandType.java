@@ -7,6 +7,7 @@ public enum CommandType {
     REGISTER_EXPENSE("/saida"),
     CHECK_BALANCE("/extrato"),
     SET_LIMIT("/limite"),
+    HELP("/help"),
     CONFIRM_YES("sim"),
     CONFIRM_NO("não"),
     UNKNOWN("");
