@@ -79,6 +79,10 @@ public class WebhookController {
                 handleSetLimit(chatId, messageText);
                 break;
 
+            case HELP:
+                handleHelp(chatId);
+                break;
+
             case CONFIRM_YES:
                 handleConfirmationYes(chatId);
                 break;
@@ -140,6 +144,21 @@ public class WebhookController {
                 },
                 () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse: `/limite 1000.00`")
         );
+    }
+
+    private void handleHelp(String chatId) {
+        String helpMessage = "\uD83D\uDC54 *Pois não, senhor. Aqui estão as funções que posso executar no momento:*\n\n" +
+                "📈 */entrada <valor> <descrição> <categoria>*\n" +
+                "_Registra uma nova entrada de ativos (ex: /entrada 5000 Salário)._\n\n" +
+                "📉 */saida <valor> <descrição> <categoria>*\n" +
+                "_Registra uma nova despesa (ex: /saida 50 Jantar Lazer)._\n\n" +
+                "📋 */extrato <mês>*\n" +
+                "_Exibe o relatório detalhado. Ex: /extrato 4 (para Abril)._\n\n" +
+                "🎯 */limite <valor>*\n" +
+                "_Define seu teto de gastos mensal para que eu possa alertá-lo._\n\n" +
+                "❓ *Deseja algo mais, senhor?*";
+
+        wahaClient.sendTextMessage(chatId, helpMessage);
     }
 
     private void handleRegisterExpense(String chatId, String text) {
