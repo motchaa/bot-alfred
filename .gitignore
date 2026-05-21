@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Alfred Custom Ignores ###
+src/main/resources/application.properties
+.env
+

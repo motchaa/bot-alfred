@@ -1,4 +1,4 @@
-package com.codace.bot;
+package com.alfred.bot;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

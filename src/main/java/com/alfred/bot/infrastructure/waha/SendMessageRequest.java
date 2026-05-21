@@ -1,4 +1,4 @@
-package com.codace.bot.infrastructure.waha;
+package com.alfred.bot.infrastructure.waha;
 
 public class SendMessageRequest {
     private String session;

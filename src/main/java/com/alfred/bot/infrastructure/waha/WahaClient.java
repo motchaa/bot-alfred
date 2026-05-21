@@ -1,7 +1,8 @@
-package com.codace.bot.infrastructure.waha;
+package com.alfred.bot.infrastructure.waha;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -11,10 +12,11 @@ public class WahaClient {
     private static final Logger log = LoggerFactory.getLogger(WahaClient.class);
     private final WebClient webClient;
 
-    public WahaClient() {
+    public WahaClient(@Value("${waha.base.url}") String baseUrl, 
+                      @Value("${waha.api.key}") String apiKey) {
         this.webClient = WebClient.builder()
-                .baseUrl("http://localhost:3000")
-                .defaultHeader("X-Api-Key", "alfred-secret-key")
+                .baseUrl(baseUrl)
+                .defaultHeader("X-Api-Key", apiKey)
                 .build();
     }
 
