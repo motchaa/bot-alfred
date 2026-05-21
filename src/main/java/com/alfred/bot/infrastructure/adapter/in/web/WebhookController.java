@@ -51,54 +51,55 @@ public class WebhookController {
 
     @PostMapping
     public void handleWebhook(@RequestBody WahaWebhookEvent event) {
-        if (event == null || event.getPayload() == null) {
-            return;
-        }
+        try {
+            if (event == null || event.getPayload() == null) {
+                return;
+            }
 
-        String chatId = event.getPayload().getFrom();
-        String messageText = event.getPayload().getBody();
+            String chatId = event.getPayload().getFrom();
+            String messageText = event.getPayload().getBody();
 
-        if (!chatId.equals(ownerNumber)) {
-            log.warn("⚠️ Acesso não autorizado bloqueado: {}", chatId);
-            return;
-        }
+            log.info("📩 Nova mensagem recebida de: {}", chatId);
 
-        if (messageText == null || messageText.isBlank()) return;
+            if (!chatId.equals(ownerNumber)) {
+                log.warn("⚠️ Acesso não autorizado bloqueado: {}", chatId);
+                return;
+            }
 
-        CommandType commandType = commandParser.getCommandType(messageText);
+            if (messageText == null || messageText.isBlank()) return;
 
-        switch (commandType) {
-            case REGISTER_EXPENSE:
-                handleRegisterExpense(chatId, messageText);
-                break;
+            CommandType commandType = commandParser.getCommandType(messageText);
+            log.info("🤖 Comando identificado: {}", commandType);
 
-            case CHECK_BALANCE:
-                handleCheckBalance(chatId, messageText);
-                break;
-
-            case HELP:
-                handleHelp(chatId);
-                break;
-
-            case REGISTER_INCOME:
-                handleRegisterIncome(chatId, messageText);
-                break;
-
-            case SET_LIMIT:
-                handleSetLimit(chatId, messageText);
-                break;
-
-            case CONFIRM_YES:
-                handleConfirmationYes(chatId);
-                break;
-
-            case CONFIRM_NO:
-                handleConfirmationNo(chatId);
-                break;
-
-            default:
-                handleGreeting(chatId);
-                break;
+            switch (commandType) {
+                case REGISTER_EXPENSE:
+                    handleRegisterExpense(chatId, messageText);
+                    break;
+                case CHECK_BALANCE:
+                    handleCheckBalance(chatId, messageText);
+                    break;
+                case HELP:
+                    handleHelp(chatId);
+                    break;
+                case REGISTER_INCOME:
+                    handleRegisterIncome(chatId, messageText);
+                    break;
+                case SET_LIMIT:
+                    handleSetLimit(chatId, messageText);
+                    break;
+                case CONFIRM_YES:
+                    handleConfirmationYes(chatId);
+                    break;
+                case CONFIRM_NO:
+                    handleConfirmationNo(chatId);
+                    break;
+                default:
+                    handleGreeting(chatId);
+                    break;
+            }
+        } catch (Exception e) {
+            log.error("❌ ERRO CRÍTICO NO WEBHOOK: ", e);
+            throw e; // Mantém o 500 mas agora com o motivo no log
         }
     }
 
