@@ -59,11 +59,12 @@ public class WebhookController {
             String chatId = event.getPayload().getFrom();
             String messageText = event.getPayload().getBody();
 
-            // Sanitização: Remove espaços e metadados injetados pelo ambiente
-            String cleanChatId = chatId.split(" ")[0].trim();
-            String cleanOwner = ownerNumber.split(" ")[0].trim();
+            // Sanitização robusta: Pega apenas a primeira parte antes de qualquer espaço ou símbolo @
+            String cleanChatId = chatId.split("[\\s@]+")[0].trim();
+            String cleanOwner = ownerNumber.split("[\\s@]+")[0].trim();
 
-            log.info("📩 Mensagem de: {} (Sanitizado: {})", chatId, cleanChatId);
+            log.info("📩 Mensagem de: {} | ID Sanitizado: {}", chatId, cleanChatId);
+            log.info("🎯 Dono autorizado: {}", cleanOwner);
 
             if (!cleanChatId.equals(cleanOwner)) {
                 log.warn("⚠️ Bloqueado: {} != {}", cleanChatId, cleanOwner);
