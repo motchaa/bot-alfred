@@ -13,6 +13,7 @@ import com.alfred.bot.domain.port.in.RegisterIncomeUseCase;
 import com.alfred.bot.infrastructure.waha.WahaClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,6 +45,9 @@ public class WebhookController {
     private final ManageMonthlyLimitUseCase manageMonthlyLimitUseCase;
     private final PendingTransactionService pendingTransactionService;
 
+    @Value("${whatsapp.owner.number}")
+    private String ownerNumber;
+
 
     @PostMapping
     public void handleWebhook(@RequestBody WahaWebhookEvent event) {
@@ -53,6 +57,11 @@ public class WebhookController {
 
         String chatId = event.getPayload().getFrom();
         String messageText = event.getPayload().getBody();
+
+        if (!chatId.equals(ownerNumber)) {
+            log.warn("⚠️ Acesso não autorizado bloqueado: {}", chatId);
+            return;
+        }
 
         if (messageText == null || messageText.isBlank()) return;
 
@@ -77,10 +86,6 @@ public class WebhookController {
 
             case SET_LIMIT:
                 handleSetLimit(chatId, messageText);
-                break;
-
-            case HELP:
-                handleHelp(chatId);
                 break;
 
             case CONFIRM_YES:
@@ -144,21 +149,6 @@ public class WebhookController {
                 },
                 () -> wahaClient.sendTextMessage(chatId, "⚠️ *Formato Inválido!*\n\nUse: `/limite 1000.00`")
         );
-    }
-
-    private void handleHelp(String chatId) {
-        String helpMessage = "\uD83D\uDC54 *Pois não, senhor. Aqui estão as funções que posso executar no momento:*\n\n" +
-                "📈 */entrada <valor> <descrição> <categoria>*\n" +
-                "_Registra uma nova entrada de ativos (ex: /entrada 5000 Salário)._\n\n" +
-                "📉 */saida <valor> <descrição> <categoria>*\n" +
-                "_Registra uma nova despesa (ex: /saida 50 Jantar Lazer)._\n\n" +
-                "📋 */extrato <mês>*\n" +
-                "_Exibe o relatório detalhado. Ex: /extrato 4 (para Abril)._\n\n" +
-                "🎯 */limite <valor>*\n" +
-                "_Define seu teto de gastos mensal para que eu possa alertá-lo._\n\n" +
-                "❓ *Deseja algo mais, senhor?*";
-
-        wahaClient.sendTextMessage(chatId, helpMessage);
     }
 
     private void handleRegisterExpense(String chatId, String text) {
