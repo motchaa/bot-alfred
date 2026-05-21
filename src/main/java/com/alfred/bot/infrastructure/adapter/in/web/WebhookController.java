@@ -102,6 +102,11 @@ public class WebhookController {
         }
     }
 
+    @org.springframework.web.bind.annotation.GetMapping
+    public String healthCheck() {
+        return "Alfred is alive and at your service, sir! 🎩";
+    }
+
     private void handleGreeting(String chatId) {
         LocalTime now = LocalTime.now();
         String greeting;
